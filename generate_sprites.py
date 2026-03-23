@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Generate sprite assets for KubasaurusTank using Pillow."""
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 import os
 import math
+import random
 
 OUTPUT_DIR = "assets/textures"
 TILE_W, TILE_H = 64, 32
@@ -218,41 +219,419 @@ def gen_ui():
         draw.text((8, 10), name[0].upper(), fill=color)
         save(img, f"icon_{name}.png")
 
-# === SPLASH / BG ===
+# === SPLASH / BG / LOGO — inspired by idea.jpg (T-Rex on military tank, palms, mountains) ===
+
+def _draw_mountains(draw, w, y_base, peaks, color_dark, color_light):
+    """Draw a mountain range silhouette."""
+    for px, py, pw in peaks:
+        pts = [(px - pw, y_base), (px, py), (px + pw, y_base)]
+        draw.polygon(pts, fill=color_dark)
+        # Snow cap / lighter peak
+        cap_h = (y_base - py) * 0.25
+        cap_pts = [(px - pw * 0.2, py + cap_h), (px, py), (px + pw * 0.2, py + cap_h)]
+        draw.polygon(cap_pts, fill=color_light)
+
+
+def _draw_palm(draw, x, y, height, leaf_size):
+    """Draw a palm tree."""
+    trunk_color = (90, 60, 25)
+    leaf_color = (30, 120, 30)
+    leaf_color2 = (45, 140, 40)
+    # Trunk (slightly curved)
+    for i in range(height):
+        t = i / height
+        cx = x + int(math.sin(t * 1.5) * 5)
+        tw = max(2, int(4 * (1 - t * 0.5)))
+        draw.rectangle([cx - tw, y - i, cx + tw, y - i + 1],
+                        fill=(trunk_color[0] + int(t * 20), trunk_color[1] + int(t * 10), trunk_color[2]))
+    top_y = y - height
+    top_x = x + int(math.sin(1.5) * 5)
+    # Leaves — 5-6 drooping arcs
+    for angle_deg in range(-150, 180, 60):
+        a = math.radians(angle_deg)
+        for t in range(leaf_size):
+            frac = t / leaf_size
+            lx = top_x + int(math.cos(a) * t * 1.5)
+            ly = top_y + int(math.sin(a) * t * 0.5) + int(frac * frac * leaf_size * 0.6)
+            lw = max(1, int((1 - frac) * 4))
+            c = leaf_color if (t % 3 < 2) else leaf_color2
+            draw.ellipse([lx - lw, ly - 1, lx + lw, ly + 1], fill=c)
+
+
+def _draw_dino_tank(draw, cx, cy, scale=1.0):
+    """Draw a detailed dino-tank (T-Rex fused with tank) — inspired by idea.jpg."""
+    s = scale
+
+    # === TANK BASE ===
+    # Tracks
+    track_color = (50, 50, 50)
+    track_detail = (70, 70, 65)
+    # Left track
+    draw.rounded_rectangle([int(cx - 65*s), int(cy + 10*s), int(cx - 30*s), int(cy + 40*s)],
+                            radius=int(5*s), fill=track_color, outline=(35, 35, 35))
+    # Right track
+    draw.rounded_rectangle([int(cx + 30*s), int(cy + 10*s), int(cx + 65*s), int(cy + 40*s)],
+                            radius=int(5*s), fill=track_color, outline=(35, 35, 35))
+    # Track wheels
+    for tx_offset in [-55, -45, -35, 35, 45, 55]:
+        wx = int(cx + tx_offset * s)
+        wy = int(cy + 25 * s)
+        r = int(6 * s)
+        draw.ellipse([wx-r, wy-r, wx+r, wy+r], fill=track_detail, outline=(40, 40, 40))
+
+    # Hull (main body)
+    hull_color = (55, 130, 55)
+    hull_dark = (40, 100, 40)
+    hull_light = (70, 155, 65)
+    hull_pts = [
+        (int(cx - 55*s), int(cy + 15*s)),
+        (int(cx - 45*s), int(cy - 5*s)),
+        (int(cx + 50*s), int(cy - 5*s)),
+        (int(cx + 60*s), int(cy + 15*s)),
+    ]
+    draw.polygon(hull_pts, fill=hull_color, outline=hull_dark)
+    # Hull top highlight
+    hull_top_pts = [
+        (int(cx - 42*s), int(cy - 3*s)),
+        (int(cx + 47*s), int(cy - 3*s)),
+        (int(cx + 42*s), int(cy + 5*s)),
+        (int(cx - 38*s), int(cy + 5*s)),
+    ]
+    draw.polygon(hull_top_pts, fill=hull_light)
+
+    # Front armor plate
+    draw.rectangle([int(cx + 45*s), int(cy - 2*s), int(cx + 58*s), int(cy + 12*s)],
+                    fill=hull_dark, outline=(30, 80, 30))
+
+    # === TURRET ===
+    turret_color = (45, 115, 45)
+    turret_light = (60, 135, 55)
+    # Turret ring
+    tr = int(18 * s)
+    draw.ellipse([int(cx - 5*s) - tr, int(cy - 10*s) - tr,
+                  int(cx - 5*s) + tr, int(cy - 10*s) + tr],
+                  fill=turret_color, outline=hull_dark)
+    # Turret highlight
+    tri = int(12 * s)
+    draw.ellipse([int(cx - 5*s) - tri, int(cy - 13*s) - tri,
+                  int(cx - 5*s) + tri, int(cy - 13*s) + int(tri * 0.5)],
+                  fill=turret_light)
+
+    # === GUN BARREL ===
+    barrel_color = (50, 100, 45)
+    bx = int(cx + 15 * s)
+    by = int(cy - 12 * s)
+    barrel_len = int(55 * s)
+    barrel_h = int(6 * s)
+    draw.rectangle([bx, by - barrel_h//2, bx + barrel_len, by + barrel_h//2],
+                    fill=barrel_color, outline=(35, 80, 35))
+    # Muzzle brake
+    draw.rectangle([bx + barrel_len - int(4*s), by - barrel_h, bx + barrel_len, by + barrel_h],
+                    fill=(40, 90, 40), outline=(30, 70, 30))
+
+    # === T-REX HEAD (on turret) ===
+    head_color = (55, 140, 55)
+    head_dark = (40, 110, 40)
+    head_light = (70, 165, 65)
+
+    # Neck
+    neck_pts = [
+        (int(cx - 15*s), int(cy - 25*s)),
+        (int(cx - 25*s), int(cy - 55*s)),
+        (int(cx - 15*s), int(cy - 60*s)),
+        (int(cx - 5*s), int(cy - 30*s)),
+    ]
+    draw.polygon(neck_pts, fill=head_color, outline=head_dark)
+
+    # Head (large jaw shape)
+    head_pts = [
+        (int(cx - 30*s), int(cy - 55*s)),  # back of head
+        (int(cx - 28*s), int(cy - 75*s)),  # top of head
+        (int(cx - 5*s), int(cy - 72*s)),   # forehead
+        (int(cx + 15*s), int(cy - 62*s)),  # snout top
+        (int(cx + 15*s), int(cy - 52*s)),  # snout bottom
+        (int(cx - 5*s), int(cy - 48*s)),   # lower jaw back
+        (int(cx - 30*s), int(cy - 50*s)),  # chin
+    ]
+    draw.polygon(head_pts, fill=head_color, outline=head_dark)
+
+    # Upper jaw / snout lighter
+    snout_pts = [
+        (int(cx - 5*s), int(cy - 70*s)),
+        (int(cx + 13*s), int(cy - 62*s)),
+        (int(cx + 13*s), int(cy - 57*s)),
+        (int(cx - 5*s), int(cy - 60*s)),
+    ]
+    draw.polygon(snout_pts, fill=head_light)
+
+    # Eye
+    eye_x, eye_y = int(cx - 12*s), int(cy - 66*s)
+    er = int(5 * s)
+    draw.ellipse([eye_x - er, eye_y - er, eye_x + er, eye_y + er],
+                  fill=(255, 255, 180), outline=(40, 40, 20))
+    # Pupil (slit)
+    pr = int(3 * s)
+    draw.ellipse([eye_x - pr + 1, eye_y - pr, eye_x + 1, eye_y + pr],
+                  fill=(20, 20, 10))
+    # Eye glow
+    draw.ellipse([eye_x - 1, eye_y - 1, eye_x + 1, eye_y + 1], fill=(255, 255, 220))
+
+    # Teeth (upper jaw)
+    for i in range(6):
+        tx = int(cx + (-2 + i * 3) * s)
+        ty_top = int(cy - 57 * s)
+        tooth_h = int((4 + (i % 2) * 2) * s)
+        draw.polygon([(tx, ty_top), (tx + int(2*s), ty_top),
+                       (tx + int(1*s), ty_top + tooth_h)],
+                      fill=(255, 255, 240))
+    # Teeth (lower jaw)
+    for i in range(5):
+        tx = int(cx + (-1 + i * 3) * s)
+        ty_bot = int(cy - 52 * s)
+        tooth_h = int((3 + (i % 2) * 2) * s)
+        draw.polygon([(tx, ty_bot), (tx + int(2*s), ty_bot),
+                       (tx + int(1*s), ty_bot - tooth_h)],
+                      fill=(240, 240, 230))
+
+    # Nostril
+    nx, ny = int(cx + 10*s), int(cy - 64*s)
+    draw.ellipse([nx, ny, nx + int(3*s), ny + int(2*s)], fill=head_dark)
+
+    # Small arms (T-Rex style) on the hull
+    arm_color = (50, 130, 50)
+    # Left arm
+    draw.line([int(cx - 20*s), int(cy - 2*s), int(cx - 28*s), int(cy + 8*s)],
+              fill=arm_color, width=max(1, int(3*s)))
+    draw.line([int(cx - 28*s), int(cy + 8*s), int(cx - 25*s), int(cy + 14*s)],
+              fill=arm_color, width=max(1, int(2*s)))
+
+    # Tail (stubby, coming off the back of the hull)
+    tail_pts = [
+        (int(cx - 50*s), int(cy + 2*s)),
+        (int(cx - 75*s), int(cy - 5*s)),
+        (int(cx - 80*s), int(cy + 3*s)),
+        (int(cx - 70*s), int(cy + 12*s)),
+        (int(cx - 50*s), int(cy + 12*s)),
+    ]
+    draw.polygon(tail_pts, fill=head_color, outline=head_dark)
+
+    # Spines along neck/back
+    for i in range(5):
+        sx_spine = int(cx + (-22 + i * 4) * s)
+        sy_spine = int(cy + (-55 + i * 8) * s)
+        spine_h = int((6 - i * 0.5) * s)
+        draw.polygon([(sx_spine - int(2*s), sy_spine),
+                       (sx_spine, sy_spine - spine_h),
+                       (sx_spine + int(2*s), sy_spine)],
+                      fill=(40, 110, 35))
+
+
 def gen_bg():
-    print("Backgrounds:")
-    # Simple dark military green background
-    img = Image.new('RGBA', (256, 256), (15, 30, 15))
+    print("Backgrounds & Logo:")
+    random.seed(42)  # Reproducible
+
+    # === MENU BACKGROUND (1024x768 tiled from 512x384) ===
+    w, h = 512, 384
+    img = Image.new('RGBA', (w, h), (8, 18, 8))
     draw = ImageDraw.Draw(img)
-    # Subtle grid pattern
-    for i in range(0, 256, 32):
-        draw.line([i, 0, i, 255], fill=(20, 35, 20), width=1)
-        draw.line([0, i, 255, i], fill=(20, 35, 20), width=1)
+
+    # Gradient sky → ground
+    for y in range(h):
+        frac = y / h
+        if frac < 0.3:
+            # Sky gradient (dark blue-green to lighter)
+            r = int(5 + frac * 30)
+            g = int(15 + frac * 50)
+            b = int(20 + frac * 20)
+        else:
+            # Ground gradient (military green gets darker)
+            r = int(14 - (frac - 0.3) * 10)
+            g = int(30 - (frac - 0.3) * 20)
+            b = int(14 - (frac - 0.3) * 10)
+        draw.line([(0, y), (w, y)], fill=(r, g, b))
+
+    # Stars in sky area
+    for _ in range(40):
+        sx, sy = random.randint(0, w), random.randint(0, int(h * 0.25))
+        brightness = random.randint(60, 150)
+        draw.point((sx, sy), fill=(brightness, brightness, brightness + 30))
+
+    # Distant mountains
+    _draw_mountains(draw, w, int(h * 0.4),
+                    [(80, int(h * 0.2), 70), (200, int(h * 0.15), 90),
+                     (350, int(h * 0.22), 65), (450, int(h * 0.18), 80)],
+                    (15, 35, 20), (25, 50, 30))
+
+    # Closer mountains
+    _draw_mountains(draw, w, int(h * 0.5),
+                    [(60, int(h * 0.32), 50), (180, int(h * 0.28), 70),
+                     (310, int(h * 0.35), 55), (420, int(h * 0.3), 65)],
+                    (12, 28, 15), (18, 40, 22))
+
+    # Ground texture — subtle camo pattern
+    for _ in range(300):
+        gx = random.randint(0, w)
+        gy = random.randint(int(h * 0.5), h)
+        gs = random.randint(3, 12)
+        gc = random.choice([(10, 22, 10), (15, 30, 12), (8, 20, 8), (12, 25, 10)])
+        draw.ellipse([gx, gy, gx + gs, gy + gs // 2], fill=gc)
+
+    # Military grid overlay (subtle)
+    for i in range(0, w, 64):
+        draw.line([i, 0, i, h], fill=(15, 28, 15, 40), width=1)
+    for i in range(0, h, 64):
+        draw.line([0, i, w, i], fill=(15, 28, 15, 40), width=1)
+
     save(img, "bg_menu.png")
 
-    # Splash screen (simple title card)
-    img = Image.new('RGBA', (512, 384), (10, 20, 10))
+    # === SPLASH SCREEN (512x384) — Dino-tank hero image ===
+    img = Image.new('RGBA', (512, 384), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    # Border
-    draw.rectangle([10, 10, 501, 373], outline=(60, 140, 40), width=3)
-    # Simple dino-tank silhouette (crude but recognizable)
-    cx, cy = 256, 180
-    # Tank body
-    draw.rectangle([cx-50, cy, cx+50, cy+30], fill=(50, 130, 50), outline=(30, 100, 30))
-    # Tracks
-    draw.rectangle([cx-55, cy+25, cx-35, cy+35], fill=(60, 60, 60))
-    draw.rectangle([cx+35, cy+25, cx+55, cy+35], fill=(60, 60, 60))
-    # Turret
-    draw.ellipse([cx-15, cy-10, cx+15, cy+15], fill=(40, 110, 40))
-    draw.rectangle([cx+10, cy-3, cx+60, cy+5], fill=(40, 110, 40))
-    # Dino head on turret
-    draw.ellipse([cx-25, cy-40, cx+5, cy-5], fill=(60, 150, 60))  # head
-    draw.ellipse([cx-18, cy-35, cx-10, cy-27], fill=(255, 255, 200))  # eye
-    draw.ellipse([cx-15, cy-33, cx-12, cy-30], fill=(0, 0, 0))  # pupil
-    # Teeth
-    for tx in range(cx-22, cx-5, 4):
-        draw.polygon([(tx, cy-12), (tx+3, cy-12), (tx+1, cy-7)], fill=(255, 255, 255))
+
+    # Sky gradient
+    for y in range(384):
+        frac = y / 384
+        if frac < 0.5:
+            t = frac / 0.5
+            r = int(30 + t * 40)
+            g = int(60 + t * 60)
+            b = int(80 + t * 30)
+        else:
+            t = (frac - 0.5) / 0.5
+            r = int(70 - t * 50)
+            g = int(120 - t * 70)
+            b = int(110 - t * 80)
+        draw.line([(0, y), (511, y)], fill=(r, g, b))
+
+    # Mountains in background
+    _draw_mountains(draw, 512, 200,
+                    [(50, 100, 60), (150, 80, 80), (280, 110, 70),
+                     (380, 75, 90), (480, 95, 55)],
+                    (25, 55, 30), (40, 75, 45))
+
+    # Ground
+    for y in range(200, 384):
+        frac = (y - 200) / 184
+        r = int(40 + frac * 10)
+        g = int(90 - frac * 30)
+        b = int(30 + frac * 5)
+        draw.line([(0, y), (511, y)], fill=(r, g, b))
+
+    # Palm trees
+    _draw_palm(draw, 50, 280, 80, 18)
+    _draw_palm(draw, 440, 260, 90, 20)
+    _draw_palm(draw, 480, 290, 60, 14)
+
+    # THE DINO-TANK (center)
+    _draw_dino_tank(draw, 256, 280, scale=1.4)
+
+    # Muzzle flash
+    fx, fy = 350, 252
+    for r_flash in range(20, 0, -3):
+        alpha = int(150 * (r_flash / 20))
+        draw.ellipse([fx - r_flash, fy - r_flash // 2, fx + r_flash, fy + r_flash // 2],
+                      fill=(255, 255, 100, alpha))
+    draw.ellipse([fx - 5, fy - 3, fx + 5, fy + 3], fill=(255, 255, 255, 200))
+
+    # Dust clouds at tracks
+    for _ in range(15):
+        dx = random.randint(170, 340)
+        dy = random.randint(310, 350)
+        dr = random.randint(8, 20)
+        da = random.randint(40, 100)
+        draw.ellipse([dx - dr, dy - dr // 2, dx + dr, dy + dr // 2],
+                      fill=(120, 110, 80, da))
+
+    # Border frame (military style — double line with corner brackets)
+    draw.rectangle([4, 4, 507, 379], outline=(80, 160, 60), width=2)
+    draw.rectangle([8, 8, 503, 375], outline=(40, 80, 30), width=1)
+    # Corner brackets
+    blen = 30
+    for (bx, by, dx, dy) in [(10, 10, 1, 1), (501, 10, -1, 1),
+                               (10, 373, 1, -1), (501, 373, -1, -1)]:
+        draw.line([bx, by, bx + blen * dx, by], fill=(120, 200, 80), width=2)
+        draw.line([bx, by, bx, by + blen * dy], fill=(120, 200, 80), width=2)
+
     save(img, "splash.png")
+
+    # === GAME LOGO (400x120) — "KUBASAURUS TANK" styled text placeholder ===
+    logo_w, logo_h = 400, 120
+    img = Image.new('RGBA', (logo_w, logo_h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    # Big block letters "KUBASAURUS" — pixel art style
+    def draw_block_letter(draw, x, y, letter_data, color, pixel_size=3):
+        """Draw a letter from a pixel grid."""
+        for row_idx, row in enumerate(letter_data):
+            for col_idx, pixel in enumerate(row):
+                if pixel:
+                    px = x + col_idx * pixel_size
+                    py = y + row_idx * pixel_size
+                    draw.rectangle([px, py, px + pixel_size - 1, py + pixel_size - 1], fill=color)
+
+    # Simple block letters for "KUBA" — keeping it recognizable as a logo mark
+    # Draw a stylized dino-jaw silhouette as logo icon instead
+    lcx, lcy = 60, 60
+    # Tank silhouette
+    draw.rounded_rectangle([lcx - 40, lcy + 5, lcx + 40, lcy + 25],
+                            radius=3, fill=(50, 130, 50), outline=(30, 90, 30))
+    draw.rectangle([lcx - 45, lcy + 18, lcx - 25, lcy + 28], fill=(55, 55, 55))
+    draw.rectangle([lcx + 25, lcy + 18, lcx + 45, lcy + 28], fill=(55, 55, 55))
+    # Barrel
+    draw.rectangle([lcx + 15, lcy - 2, lcx + 55, lcy + 6], fill=(45, 110, 45), outline=(30, 80, 30))
+    # Dino head mini
+    head_pts_logo = [
+        (lcx - 20, lcy + 5), (lcx - 22, lcy - 15), (lcx - 10, lcy - 20),
+        (lcx + 5, lcy - 15), (lcx + 5, lcy - 5), (lcx - 10, lcy - 2), (lcx - 20, lcy)
+    ]
+    draw.polygon(head_pts_logo, fill=(55, 140, 55), outline=(35, 100, 35))
+    # Eye
+    draw.ellipse([lcx - 16, lcy - 16, lcx - 10, lcy - 10], fill=(255, 255, 180))
+    draw.ellipse([lcx - 14, lcy - 14, lcx - 11, lcy - 11], fill=(20, 20, 10))
+    # Teeth
+    for i in range(4):
+        tx_l = lcx - 8 + i * 4
+        draw.polygon([(tx_l, lcy - 7), (tx_l + 2, lcy - 7), (tx_l + 1, lcy - 2)],
+                      fill=(255, 255, 240))
+
+    # Title text area (right side) — block style "KUBASAURUS" and "TANK"
+    # Since we don't have a font loaded, draw colored rectangles as a title bar
+    title_x = 130
+    # "KUBASAURUS" — bright green bar with dark outline
+    draw.rounded_rectangle([title_x, 10, title_x + 250, 50],
+                            radius=5, fill=(15, 30, 12, 200), outline=(80, 180, 60))
+    # "TANK" — yellow accent bar
+    draw.rounded_rectangle([title_x + 30, 55, title_x + 220, 90],
+                            radius=5, fill=(15, 30, 12, 200), outline=(220, 200, 40))
+
+    # Decorative stars / military insignia
+    star_x, star_y = title_x + 230, 70
+    for angle in range(0, 360, 72):
+        a = math.radians(angle - 90)
+        a2 = math.radians(angle - 90 + 36)
+        outer = 12
+        inner = 5
+        x1 = star_x + int(math.cos(a) * outer)
+        y1 = star_y + int(math.sin(a) * outer)
+        x2 = star_x + int(math.cos(a2) * inner)
+        y2 = star_y + int(math.sin(a2) * inner)
+        draw.line([star_x, star_y, x1, y1], fill=(220, 200, 40), width=2)
+        draw.line([x1, y1, x2, y2], fill=(220, 200, 40), width=1)
+
+    save(img, "logo.png")
+
+    # === GAME OVER background overlay (512x384) ===
+    img = Image.new('RGBA', (512, 384), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    # Dark red vignette
+    for y in range(384):
+        for x in range(0, 512, 4):
+            dx = (x - 256) / 256
+            dy = (y - 192) / 192
+            dist = math.sqrt(dx * dx + dy * dy)
+            alpha = int(min(200, dist * 180))
+            draw.rectangle([x, y, x + 3, y], fill=(40, 0, 0, alpha))
+    save(img, "bg_gameover.png")
 
 if __name__ == "__main__":
     ensure_dir()

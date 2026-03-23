@@ -23,10 +23,14 @@ public class World extends KfsWorld {
     private float waveTimer;
     private int enemiesAlive;
     private BiConsumer<Integer, Boolean> gameOverCallback; // (score, won)
+    private SoundManager sound;
 
     public World() {
         super();
     }
+
+    public void setSoundManager(SoundManager sound) { this.sound = sound; }
+    public SoundManager getSoundManager() { return sound; }
 
     public void loadMap(String file) {
         reset();
@@ -82,7 +86,7 @@ public class World extends KfsWorld {
         addComponent(player, new HealthComp(KfsConst.PLAYER_HP));
         addComponent(player, new WeaponComp(WeaponType.CANNON, KfsConst.CANNON_FIRE_RATE, KfsConst.CANNON_DAMAGE, KfsConst.CANNON_BULLET_SPEED));
         addComponent(player, new ColliderComp(KfsConst.PLAYER_RADIUS));
-        addComponent(player, new RenderComp(Color.GREEN, 0.8f, 0.8f));
+        addComponent(player, new RenderComp(Color.GREEN, 0.8f, 0.8f, "player"));
         return player;
     }
 
@@ -127,13 +131,13 @@ public class World extends KfsWorld {
         addComponent(e, new EnemyComp(type, aggroRange, attackRange, fireRate, damage));
         addComponent(e, new WeaponComp(WeaponType.CANNON, fireRate, damage, KfsConst.ENEMY_BULLET_SPEED));
         addComponent(e, new ColliderComp(KfsConst.ENEMY_RADIUS));
-        addComponent(e, new RenderComp(color, 0.7f, 0.7f));
+        addComponent(e, new RenderComp(color, 0.7f, 0.7f, type.name().toLowerCase()));
 
         enemiesAlive++;
         return e;
     }
 
-    public Entity spawnProjectile(float x, float y, float vx, float vy, float damage, Entity owner, boolean isPlayerBullet) {
+    public Entity spawnProjectile(float x, float y, float vx, float vy, float damage, Entity owner, boolean isPlayerBullet, WeaponType weaponType) {
         Entity e = createEntity();
         addComponent(e, new PositionComp(x, y));
         VelocityComp vel = new VelocityComp(999, 999, 0);
@@ -143,7 +147,18 @@ public class World extends KfsWorld {
         addComponent(e, new ProjectileComp(damage, owner, KfsConst.BULLET_LIFETIME, isPlayerBullet));
         addComponent(e, new ColliderComp(KfsConst.BULLET_RADIUS));
         Color bulletColor = isPlayerBullet ? Color.YELLOW : Color.RED;
-        addComponent(e, new RenderComp(bulletColor, 0.2f, 0.2f));
+        String spriteKey;
+        if (!isPlayerBullet) {
+            spriteKey = "bullet_enemy";
+        } else {
+            switch (weaponType) {
+                case MG: spriteKey = "bullet_mg"; break;
+                case ROCKET: spriteKey = "bullet_rocket"; break;
+                case LASER: spriteKey = "bullet_laser"; break;
+                default: spriteKey = "bullet_cannon"; break;
+            }
+        }
+        addComponent(e, new RenderComp(bulletColor, 0.2f, 0.2f, spriteKey));
         return e;
     }
 
@@ -162,7 +177,7 @@ public class World extends KfsWorld {
             case SHIELD: color = Color.BLUE; break;
             default: color = Color.WHITE; break;
         }
-        addComponent(e, new RenderComp(color, 0.5f, 0.5f));
+        addComponent(e, new RenderComp(color, 0.5f, 0.5f, "pickup_" + type.name().toLowerCase()));
         return e;
     }
 
@@ -222,6 +237,7 @@ public class World extends KfsWorld {
         if (gameOver) return;
         gameOver = true;
         playerWon = won;
+        if (sound != null) sound.play("game_over");
         if (gameOverCallback != null) {
             gameOverCallback.accept(getScore(), won);
         }

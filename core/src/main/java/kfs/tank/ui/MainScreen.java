@@ -3,7 +3,10 @@ package kfs.tank.ui;
 import com.badlogic.gdx.Application;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.scenes.scene2d.ui.*;
+import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import kfs.tank.KfsConst;
 import kfs.tank.KfsMain;
 import kfs.tank.ScoreClient;
@@ -11,6 +14,7 @@ import kfs.tank.ScoreClient;
 public class MainScreen extends BaseScreen {
 
     private Label hiScoreLabel;
+    private Texture splashTex;
 
     public MainScreen(KfsMain game) {
         super(game, false);
@@ -27,6 +31,15 @@ public class MainScreen extends BaseScreen {
         scrollPane.setFadeScrollBars(false);
         scrollPane.setFillParent(true);
         stage.addActor(scrollPane);
+
+        // Splash image (dino-tank)
+        try {
+            splashTex = new Texture(Gdx.files.internal("textures/splash.png"));
+            Image splashImage = new Image(splashTex);
+            table.add(splashImage).width(400).height(300).padBottom(10).row();
+        } catch (Exception e) {
+            // No splash, skip
+        }
 
         // Title
         Label.LabelStyle titleStyle = new Label.LabelStyle(fontBig, Color.LIME);
@@ -114,5 +127,11 @@ public class MainScreen extends BaseScreen {
                 hiScoreLabel.setText("HI-SCORE: ---");
             }
         });
+    }
+
+    @Override
+    public void dispose() {
+        super.dispose();
+        if (splashTex != null) splashTex.dispose();
     }
 }

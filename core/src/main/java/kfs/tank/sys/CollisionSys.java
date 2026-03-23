@@ -1,6 +1,7 @@
 package kfs.tank.sys;
 
 import kfs.tank.KfsConst;
+import kfs.tank.SoundManager;
 import kfs.tank.World;
 import kfs.tank.comp.*;
 import kfs.tank.ecs.Entity;
@@ -28,6 +29,8 @@ public class CollisionSys implements KfsSystem {
         PlayerComp playerComp = world.getComponent(player, PlayerComp.class);
 
         if (playerPos == null || playerCol == null) return;
+
+        SoundManager sound = world.getSoundManager();
 
         // Update invincibility timers
         if (playerHealth != null && playerHealth.invTimer > 0) {
@@ -66,6 +69,9 @@ public class CollisionSys implements KfsSystem {
                             if (playerComp != null) playerComp.kills++;
                             world.enemyKilled();
                             world.deleteEntity(enemy);
+                            if (sound != null) sound.play("explosion");
+                        } else {
+                            if (sound != null) sound.play("hit");
                         }
                         break;
                     }
@@ -78,6 +84,7 @@ public class CollisionSys implements KfsSystem {
                             // Shield absorbs hit
                         } else {
                             playerHealth.takeDamage((int) pc.damage);
+                            if (sound != null) sound.play("hit");
                         }
                     }
                     toRemove.add(proj);
@@ -108,6 +115,7 @@ public class CollisionSys implements KfsSystem {
             if (circleOverlap(playerPos.x, playerPos.y, playerCol.radius, pkPos.x, pkPos.y, pkRad)) {
                 applyPickup(pkComp.type, playerComp, playerHealth, world.getComponent(player, WeaponComp.class), world.getComponent(player, VelocityComp.class));
                 pickedUp.add(pickup);
+                if (sound != null) sound.play("pickup");
             }
         }
 

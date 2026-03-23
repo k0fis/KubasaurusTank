@@ -1,5 +1,6 @@
 package kfs.tank.sys;
 
+import kfs.tank.SoundManager;
 import kfs.tank.World;
 import kfs.tank.comp.*;
 import kfs.tank.ecs.Entity;
@@ -27,14 +28,7 @@ public class ShootingSys implements KfsSystem {
             weapon.cooldown -= delta;
 
             boolean isPlayer = world.getComponent(e, PlayerComp.class) != null;
-            boolean shouldFire;
-
-            if (isPlayer) {
-                shouldFire = weapon.firing;
-            } else {
-                // Enemies fire when their AI sets firing=true
-                shouldFire = weapon.firing;
-            }
+            boolean shouldFire = weapon.firing;
 
             if (shouldFire && weapon.cooldown <= 0) {
                 weapon.cooldown = weapon.fireRate;
@@ -55,6 +49,16 @@ public class ShootingSys implements KfsSystem {
         float vx = cos * weapon.bulletSpeed;
         float vy = sin * weapon.bulletSpeed;
 
-        world.spawnProjectile(bx, by, vx, vy, weapon.damage, owner, isPlayer);
+        world.spawnProjectile(bx, by, vx, vy, weapon.damage, owner, isPlayer, weapon.type);
+
+        // Play weapon sound
+        SoundManager sound = world.getSoundManager();
+        if (sound != null && isPlayer) {
+            switch (weapon.type) {
+                case MG: sound.play("mg"); break;
+                case ROCKET: sound.play("rocket"); break;
+                default: sound.play("cannon"); break;
+            }
+        }
     }
 }

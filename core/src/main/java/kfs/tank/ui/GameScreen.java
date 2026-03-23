@@ -25,6 +25,7 @@ public class GameScreen extends ScreenAdapter {
         batch = new SpriteBatch();
 
         world = new World();
+        world.setSoundManager(game.sound);
         world.loadMap("maps/arena.txt");
         world.createPlayer();
 

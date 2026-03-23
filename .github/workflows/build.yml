@@ -22,6 +22,9 @@ jobs:
       - name: Build TeaVM web version
         run: ./gradlew teavm:build
 
+      - name: Copy index.html to webapp
+        run: cp teavm/src/main/resources/index.html teavm/build/dist/webapp/
+
       - name: Package webapp
         run: |
           cd teavm/build/dist/webapp
@@ -40,6 +43,7 @@ jobs:
           make_latest: true
 
       - name: Deploy to server
+        if: ${{ secrets.DEPLOY_HOST != '' }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
