@@ -28,6 +28,7 @@ public class GameScreen extends ScreenAdapter {
         world.setSoundManager(game.sound);
         world.loadMap("maps/arena.txt");
         world.createPlayer();
+        world.spawnMapPickups();
 
         // Add systems in order
         world.addSys(new InputSys(world));

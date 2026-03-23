@@ -128,10 +128,10 @@ public class WaveSys implements KfsSystem {
     }
 
     private void spawnBetweenWavePickups() {
-        List<float[]> spawns = world.getEnemySpawnZones();
-        if (spawns.isEmpty()) return;
+        // Respawn fuel at map depot locations
+        world.spawnMapPickups();
 
-        // Spawn fuel at random locations
+        // Extra fuel at random locations
         for (int i = 0; i < 2; i++) {
             float x = 2 + (float)(Math.random() * (world.getMapWidth() - 4));
             float y = 2 + (float)(Math.random() * (world.getMapHeight() - 4));

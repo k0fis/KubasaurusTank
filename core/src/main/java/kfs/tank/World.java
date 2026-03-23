@@ -16,6 +16,8 @@ public class World extends KfsWorld {
     private int mapWidth, mapHeight;
     private Entity player;
     private final List<float[]> enemySpawnZones = new ArrayList<>();
+    private final List<float[]> fuelDepots = new ArrayList<>();
+    private final List<float[]> upgradeSpots = new ArrayList<>();
     private float playerStartX, playerStartY;
     private boolean gameOver;
     private boolean playerWon;
@@ -35,6 +37,8 @@ public class World extends KfsWorld {
     public void loadMap(String file) {
         reset();
         enemySpawnZones.clear();
+        fuelDepots.clear();
+        upgradeSpots.clear();
         gameOver = false;
         playerWon = false;
         currentWave = 0;
@@ -65,6 +69,10 @@ public class World extends KfsWorld {
                 } else if (tile == Tile.ENEMY_SPAWN_1 || tile == Tile.ENEMY_SPAWN_2
                         || tile == Tile.ENEMY_SPAWN_3 || tile == Tile.ENEMY_SPAWN_4) {
                     enemySpawnZones.add(new float[]{x + 0.5f, y + 0.5f});
+                } else if (tile == Tile.FUEL_DEPOT) {
+                    fuelDepots.add(new float[]{x + 0.5f, y + 0.5f});
+                } else if (tile == Tile.UPGRADE_CRATE) {
+                    upgradeSpots.add(new float[]{x + 0.5f, y + 0.5f});
                 }
             }
         }
@@ -220,6 +228,20 @@ public class World extends KfsWorld {
     public int getMapHeight() { return mapHeight; }
     public Tile[][] getGrid() { return grid; }
     public List<float[]> getEnemySpawnZones() { return enemySpawnZones; }
+    public List<float[]> getFuelDepots() { return fuelDepots; }
+    public List<float[]> getUpgradeSpots() { return upgradeSpots; }
+
+    /** Spawn fuel pickups at all F tiles and upgrades at U tiles. */
+    public void spawnMapPickups() {
+        for (float[] pos : fuelDepots) {
+            spawnPickup(PickupType.FUEL, pos[0], pos[1]);
+        }
+        for (float[] pos : upgradeSpots) {
+            PickupType[] types = {PickupType.WEAPON, PickupType.ARMOR, PickupType.SPEED, PickupType.SHIELD};
+            PickupType type = types[(int)(Math.random() * types.length)];
+            spawnPickup(type, pos[0], pos[1]);
+        }
+    }
     public boolean isGameOver() { return gameOver; }
     public boolean isPlayerWon() { return playerWon; }
     public int getCurrentWave() { return currentWave; }
