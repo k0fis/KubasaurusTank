@@ -33,8 +33,7 @@ public class BaseScreen extends ScreenAdapter {
 
         Texture bgTex;
         try {
-            bgTex = new Texture(Gdx.files.internal("textures/bg_menu.png"));
-            bgTex.setWrap(Texture.TextureWrap.Repeat, Texture.TextureWrap.Repeat);
+            bgTex = new Texture(Gdx.files.internal("textures/bg_idea.jpg"));
         } catch (Exception e) {
             Pixmap bgPm = new Pixmap(64, 64, Pixmap.Format.RGBA8888);
             bgPm.setColor(new Color(0.05f, 0.1f, 0.05f, 1));
