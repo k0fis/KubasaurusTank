@@ -1,0 +1,78 @@
+buildscript {
+  repositories {
+    mavenCentral()
+    gradlePluginPortal()
+    mavenLocal()
+    google()
+    maven { url 'https://central.sonatype.com/repository/maven-snapshots/' }
+    maven { url "https://jitpack.io" }
+  }
+  dependencies {
+  }
+}
+
+allprojects {
+  apply plugin: 'eclipse'
+  apply plugin: 'idea'
+
+  idea {
+    module {
+      outputDir file('build/classes/java/main')
+      testOutputDir file('build/classes/java/test')
+    }
+  }
+}
+
+configure(subprojects) {
+  apply plugin: 'java-library'
+  sourceCompatibility = 11
+
+  tasks.register('generateAssetList') {
+    inputs.dir("${project.rootDir}/assets/")
+
+    File assetsFolder = new File("${project.rootDir}/assets/")
+    File assetsFile = new File(assetsFolder, "assets.txt")
+    assetsFile.delete()
+
+    fileTree(assetsFolder).matching {
+      include '**/.DS_Store'
+      include '**/._*'
+    }.files.each { it.delete() }
+
+    fileTree(assetsFolder).collect { assetsFolder.relativePath(it) }.sort().each {
+      assetsFile.append(it + "\n")
+    }
+  }
+  processResources.dependsOn 'generateAssetList'
+
+  compileJava {
+    options.incremental = true
+  }
+}
+
+subprojects {
+  version = "$projectVersion"
+  ext.appName = 'KubasaurusTank'
+  repositories {
+    mavenCentral()
+    mavenLocal()
+    maven { url 'https://central.sonatype.com/repository/maven-snapshots/' }
+    maven { url 'https://jitpack.io' }
+    maven { url 'https://teavm.org/maven/repository/' }
+  }
+}
+
+eclipse.project.name = 'KubasaurusTank' + '-parent'
+
+tasks.register("purgeMacJunk", Exec) {
+  description = "Deletes all .DS_Store and AppleDouble files in the whole project"
+  commandLine "bash", "-c", "find . -name \".DS_Store\" -delete ; find . -name \"._*\" -delete "
+}
+
+tasks.matching { it.name == "build" }.configureEach {
+  dependsOn("purgeMacJunk")
+}
+
+tasks.matching { it.name == "clean" }.configureEach {
+  dependsOn("purgeMacJunk")
+}

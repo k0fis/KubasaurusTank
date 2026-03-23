@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>KubasaurusTank</title>
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0,
+                   minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="touch-action" content="none">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        * {
+            -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #0a0e0a;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+        #canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        #splash {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: #0a0e0a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            transition: opacity 0.6s ease-out;
+        }
+        #splash.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        #splash .title {
+            font-family: 'Press Start 2P', monospace;
+            color: #66ff66;
+            font-size: 28px;
+            margin-top: 20px;
+        }
+        #splash .subtitle {
+            font-family: 'Press Start 2P', monospace;
+            color: #ffcc00;
+            font-size: 18px;
+            margin-top: 10px;
+        }
+        #progress-bar {
+            width: 200px;
+            height: 6px;
+            background: #1a2a1a;
+            border-radius: 3px;
+            margin-top: 30px;
+            overflow: hidden;
+        }
+        #progress-fill {
+            width: 0%;
+            height: 100%;
+            background: #66cc66;
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+        #splash .hint {
+            font-family: 'Press Start 2P', monospace;
+            color: #334433;
+            font-size: 8px;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+<div id="splash">
+    <div class="title">KUBASAURUS</div>
+    <div class="subtitle">T A N K</div>
+    <div id="progress-bar"><div id="progress-fill"></div></div>
+    <div class="hint">loading...</div>
+</div>
+<canvas id="canvas"></canvas>
+<script>
+    let progress = 0;
+    const progressFill = document.getElementById('progress-fill');
+    const progressInterval = setInterval(() => {
+        progress = Math.min(progress + Math.random() * 15, 90);
+        progressFill.style.width = progress + '%';
+    }, 200);
+
+    async function start() {
+        main();
+        clearInterval(progressInterval);
+        progressFill.style.width = '100%';
+        setTimeout(() => {
+            document.getElementById('splash').classList.add('hidden');
+            setTimeout(() => {
+                document.getElementById('splash').remove();
+            }, 700);
+        }, 300);
+    }
+    window.addEventListener("load", start);
+    document.addEventListener("gesturestart", e => e.preventDefault());
+    document.addEventListener("gesturechange", e => e.preventDefault());
+    document.addEventListener("gestureend", e => e.preventDefault());
+    document.addEventListener("touchmove", e => e.preventDefault(), {passive: false});
+    function resizeCanvas() {
+        const canvas = document.getElementById("canvas");
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+</script>
+<script type="text/javascript" charset="utf-8" src="app.js"></script>
+</body>
+</html>
