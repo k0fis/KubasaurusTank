@@ -7,7 +7,6 @@ import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.math.Vector3;
 import kfs.tank.*;
 import kfs.tank.comp.*;
 import kfs.tank.ecs.Entity;
@@ -41,9 +40,6 @@ public class RenderSys implements KfsSystem {
 
     // Weapon icons
     private final Map<String, Texture> iconTex = new HashMap<>();
-
-    // Crosshair
-    private Texture crosshairTex;
 
     public RenderSys(World world) {
         this.world = world;
@@ -119,13 +115,6 @@ public class RenderSys implements KfsSystem {
         for (String key : new String[]{"cannon", "mg", "rocket", "laser"}) {
             loadTexSafe(iconTex, key, "textures/icon_" + key + ".png");
         }
-
-        // Crosshair
-        try {
-            crosshairTex = new Texture(Gdx.files.internal("textures/crosshair.png"));
-        } catch (Exception e) {
-            crosshairTex = whiteTex;
-        }
     }
 
     private void loadTile(Tile tile, String filename) {
@@ -152,9 +141,6 @@ public class RenderSys implements KfsSystem {
         PositionComp playerPos = world.getComponent(player, PositionComp.class);
         if (playerPos == null) return;
 
-        // Update turret aim angle from mouse
-        updateTurretAim(playerPos);
-
         // Camera follow player (smooth)
         float targetCamX = IsoUtil.worldToScreenX(playerPos.x, playerPos.y);
         float targetCamY = IsoUtil.worldToScreenY(playerPos.x, playerPos.y);
@@ -171,28 +157,10 @@ public class RenderSys implements KfsSystem {
         // Collect and depth-sort entities
         renderEntities(batch);
 
-        // Crosshair at mouse position
-        renderCrosshair(batch);
-
         batch.end();
 
         // HUD (screen-space)
         renderHUD(batch);
-    }
-
-    private void updateTurretAim(PositionComp playerPos) {
-        Vector3 mouseScreen = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
-        camera.unproject(mouseScreen);
-
-        float mouseWorldX = IsoUtil.screenToWorldX(mouseScreen.x, mouseScreen.y);
-        float mouseWorldY = IsoUtil.screenToWorldY(mouseScreen.x, mouseScreen.y);
-
-        float dx = mouseWorldX - playerPos.x;
-        float dy = mouseWorldY - playerPos.y;
-        float angle = (float) Math.atan2(dy, dx);
-
-        TurretSys turretSys = world.getSystem(TurretSys.class);
-        if (turretSys != null) turretSys.setTargetAngle(angle);
     }
 
     private void renderTiles(SpriteBatch batch) {
@@ -297,35 +265,40 @@ public class RenderSys implements KfsSystem {
 
         float bodyW = body.getWidth();
         float bodyH = body.getHeight();
-        // Scale iso: compress Y to ~60% for isometric feel
-        float scaleX = 1.2f;
-        float scaleY = 0.8f;
 
-        // Body rotation: convert world angle to iso screen angle
-        float bodyDeg = worldAngleToIsoDeg(tank.bodyRotation);
+        // Iso sprites are pre-rendered facing right-down (screen +X direction).
+        // Screen X of movement = cos(θ) - sin(θ).  Flip when moving iso-left.
+        float bodyRot = tank.bodyRotation;
+        boolean flipBody = Math.cos(bodyRot) < Math.sin(bodyRot);
+        // FlipX mirrors BEFORE rotation in LibGDX, so render angle = bodyRot + π
+        float bodyRenderAngle = flipBody ? bodyRot + (float) Math.PI : bodyRot;
+        float bodyDeg = worldAngleToIsoDeg(bodyRenderAngle);
 
         batch.setColor(Color.WHITE);
         batch.draw(body,
             sx - bodyW / 2f, sy - bodyH / 2f,
             bodyW / 2f, bodyH / 2f,
             bodyW, bodyH,
-            scaleX, scaleY,
+            1f, 1f,
             bodyDeg,
-            0, 0, (int) bodyW, (int) bodyH, false, false);
+            0, 0, (int) bodyW, (int) bodyH, flipBody, false);
 
         // Turret on top
         if (turret != null && turret != whiteTex) {
             float turW = turret.getWidth();
             float turH = turret.getHeight();
-            float turretDeg = worldAngleToIsoDeg(tank.turretRotation);
+            float turRot = tank.turretRotation;
+            boolean flipTurret = Math.cos(turRot) < Math.sin(turRot);
+            float turRenderAngle = flipTurret ? turRot + (float) Math.PI : turRot;
+            float turretDeg = worldAngleToIsoDeg(turRenderAngle);
 
             batch.draw(turret,
                 sx - turW / 2f, sy - turH / 2f + 2,
                 turW / 2f, turH / 2f - 2,
                 turW, turH,
-                scaleX, scaleY,
+                1f, 1f,
                 turretDeg,
-                0, 0, (int) turW, (int) turH, false, false);
+                0, 0, (int) turW, (int) turH, flipTurret, false);
         }
 
         // Shield effect: blue tinted circle
@@ -383,16 +356,6 @@ public class RenderSys implements KfsSystem {
         batch.draw(tex,
             sx - w * pulse / 2f, sy - h * pulse / 2f + bounce + 8,
             w * pulse, h * pulse);
-    }
-
-    private void renderCrosshair(SpriteBatch batch) {
-        if (crosshairTex == null || crosshairTex == whiteTex) return;
-        Vector3 mouseScreen = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
-        camera.unproject(mouseScreen);
-        float cw = crosshairTex.getWidth();
-        float ch = crosshairTex.getHeight();
-        batch.setColor(Color.WHITE);
-        batch.draw(crosshairTex, mouseScreen.x - cw / 2f, mouseScreen.y - ch / 2f, cw, ch);
     }
 
     private void renderHUD(SpriteBatch batch) {
@@ -471,11 +434,15 @@ public class RenderSys implements KfsSystem {
             fontSmall.draw(batch, "SPEED! " + (int) pc.speedBoostTimer + "s", pad + 440, y - barH - 20);
         }
 
-        // Fuel warning
-        if (pc.fuel <= 0) {
-            font.setColor(Color.RED);
-            int remaining = (int)(KfsConst.FUEL_GAMEOVER_DELAY - pc.fuelEmptyTimer);
-            font.draw(batch, "NO FUEL! " + remaining + "s", KfsConst.SCREEN_W / 2f - 100, KfsConst.SCREEN_H / 2f);
+        // Low fuel warning (blinking)
+        if (pc.fuel > 0 && pc.fuel < KfsConst.FUEL_WARNING) {
+            boolean blink = (System.currentTimeMillis() / 300) % 2 == 0;
+            if (blink) {
+                font.setColor(Color.RED);
+                int secs = (int)(pc.fuel / pc.fuelDrainMove);
+                font.draw(batch, "LOW FUEL! ~" + secs + "s",
+                    KfsConst.SCREEN_W / 2f - 120, KfsConst.SCREEN_H / 2f);
+            }
         }
 
         // Between waves message
@@ -534,6 +501,5 @@ public class RenderSys implements KfsSystem {
                 if (t != null && t != whiteTex) t.dispose();
             }
         }
-        if (crosshairTex != null && crosshairTex != whiteTex) crosshairTex.dispose();
     }
 }

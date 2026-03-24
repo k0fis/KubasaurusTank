@@ -26,6 +26,7 @@ public class World extends KfsWorld {
     private int enemiesAlive;
     private BiConsumer<Integer, Boolean> gameOverCallback; // (score, won)
     private SoundManager sound;
+    private boolean touchMode;
 
     public World() {
         super();
@@ -196,6 +197,14 @@ public class World extends KfsWorld {
         return grid[tx][ty].passable;
     }
 
+    /** Check passability for an entity with given radius (all 4 corners). */
+    public boolean canPassRadius(float x, float y, float radius) {
+        return canPass(x - radius, y - radius)
+            && canPass(x + radius, y - radius)
+            && canPass(x - radius, y + radius)
+            && canPass(x + radius, y + radius);
+    }
+
     public Tile getTileAt(int tx, int ty) {
         if (tx < 0 || ty < 0 || tx >= mapWidth || ty >= mapHeight) return Tile.WALL;
         return grid[tx][ty];
@@ -268,4 +277,7 @@ public class World extends KfsWorld {
     public void setGameOverCallback(BiConsumer<Integer, Boolean> cb) {
         this.gameOverCallback = cb;
     }
+
+    public boolean isTouchMode() { return touchMode; }
+    public void setTouchMode(boolean touchMode) { this.touchMode = touchMode; }
 }

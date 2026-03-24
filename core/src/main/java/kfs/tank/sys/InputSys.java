@@ -2,6 +2,7 @@ package kfs.tank.sys;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.scenes.scene2d.ui.Touchpad;
 import kfs.tank.IsoUtil;
 import kfs.tank.KfsConst;
 import kfs.tank.World;
@@ -9,13 +10,19 @@ import kfs.tank.comp.*;
 import kfs.tank.ecs.Entity;
 import kfs.tank.ecs.KfsSystem;
 
+import java.util.List;
+
 public class InputSys implements KfsSystem {
 
     private final World world;
-    private float aimAngle;
+    private Touchpad touchpad;
 
     public InputSys(World world) {
         this.world = world;
+    }
+
+    public void setTouchpad(Touchpad touchpad) {
+        this.touchpad = touchpad;
     }
 
     @Override
@@ -37,12 +44,19 @@ public class InputSys implements KfsSystem {
             return;
         }
 
-        // WASD movement (iso: +Y = screen up, -Y = screen down)
         float inputX = 0, inputY = 0;
-        if (Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.UP)) inputY = 1;
-        if (Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN)) inputY = -1;
-        if (Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT)) inputX = -1;
-        if (Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT)) inputX = 1;
+
+        if (world.isTouchMode() && touchpad != null) {
+            // Touch mode: read from virtual joystick
+            inputX = touchpad.getKnobPercentX();
+            inputY = -touchpad.getKnobPercentY(); // Y inverted for iso
+        } else {
+            // Desktop: WASD / arrows
+            if (Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.UP)) inputY = 1;
+            if (Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN)) inputY = -1;
+            if (Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT)) inputX = -1;
+            if (Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT)) inputX = 1;
+        }
 
         // Normalize diagonal
         float len = (float) Math.sqrt(inputX * inputX + inputY * inputY);
@@ -74,16 +88,61 @@ public class InputSys implements KfsSystem {
             tank.bodyRotation = IsoUtil.lerpAngle(tank.bodyRotation, targetRot, KfsConst.BODY_ROT_SPEED * delta);
         }
 
-        // Turret aim toward mouse (in world coords)
-        // We need camera position from RenderSys, so we store the aim angle here
-        // The TurretSys will use this
-        weapon.firing = Gdx.input.isButtonPressed(Input.Buttons.LEFT)
-            || Gdx.input.isKeyPressed(Input.Keys.SPACE);
+        // Firing logic
+        if (weapon != null) {
+            Entity nearest = findNearestEnemy(pos);
+            if (nearest != null) {
+                // Auto-fire at enemy within range
+                PositionComp ep = world.getComponent(nearest, PositionComp.class);
+                if (ep != null) {
+                    float dx = ep.x - pos.x;
+                    float dy = ep.y - pos.y;
+                    float dist = (float) Math.sqrt(dx * dx + dy * dy);
+                    weapon.firing = dist < 10f;
+                } else {
+                    weapon.firing = false;
+                }
+            } else {
+                // No enemies: manual fire (Space/mouse) shoots in movement direction
+                // On touch: fire while moving
+                boolean manualFire = Gdx.input.isKeyPressed(Input.Keys.SPACE)
+                    || Gdx.input.isButtonPressed(Input.Buttons.LEFT);
+                boolean touchFire = world.isTouchMode() && len > 0;
+                weapon.firing = manualFire || touchFire;
+            }
+        }
 
-        // Weapon switching
+        // Weapon switching (keyboard — touch uses button in GameScreen)
         if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_1) || Gdx.input.isKeyJustPressed(Input.Keys.Q)) {
             cycleWeapon(weapon);
         }
+    }
+
+    /** Find the nearest enemy entity to the given position. */
+    Entity findNearestEnemy(PositionComp playerPos) {
+        List<Entity> enemies = world.getEntitiesWith(EnemyComp.class);
+        Entity nearest = null;
+        float nearestDist = Float.MAX_VALUE;
+        for (Entity e : enemies) {
+            PositionComp ep = world.getComponent(e, PositionComp.class);
+            if (ep == null) continue;
+            float dx = ep.x - playerPos.x;
+            float dy = ep.y - playerPos.y;
+            float dist = dx * dx + dy * dy;
+            if (dist < nearestDist) {
+                nearestDist = dist;
+                nearest = e;
+            }
+        }
+        return nearest;
+    }
+
+    /** Public weapon cycle — called from touch button in GameScreen. */
+    public void cyclePlayerWeapon() {
+        Entity player = world.getPlayer();
+        if (player == null) return;
+        WeaponComp weapon = world.getComponent(player, WeaponComp.class);
+        if (weapon != null) cycleWeapon(weapon);
     }
 
     private void cycleWeapon(WeaponComp weapon) {
@@ -114,7 +173,4 @@ public class InputSys implements KfsSystem {
                 break;
         }
     }
-
-    public float getAimAngle() { return aimAngle; }
-    public void setAimAngle(float a) { this.aimAngle = a; }
 }

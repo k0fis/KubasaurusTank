@@ -25,10 +25,10 @@ public class KfsConst {
 
     // Fuel
     public static final float MAX_FUEL = 100f;
-    public static final float FUEL_DRAIN_IDLE = 1f;
-    public static final float FUEL_DRAIN_MOVE = 3f;
-    public static final float FUEL_PICKUP_AMOUNT = 25f;
-    public static final float FUEL_GAMEOVER_DELAY = 10f;
+    public static final float FUEL_DRAIN_IDLE = 0.3f;
+    public static final float FUEL_DRAIN_MOVE = 1.0f;
+    public static final float FUEL_PICKUP_AMOUNT = 30f;
+    public static final float FUEL_WARNING = 15f; // warn when fuel below this
 
     // Weapons
     public static final float CANNON_FIRE_RATE = 0.8f;

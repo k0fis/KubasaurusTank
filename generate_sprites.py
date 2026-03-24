@@ -219,6 +219,47 @@ def gen_ui():
         draw.text((8, 10), name[0].upper(), fill=color)
         save(img, f"icon_{name}.png")
 
+# === TOUCH CONTROLS ===
+def gen_touch_controls():
+    print("Touch controls:")
+    # Touchpad background (120x120) — translucent circle with border
+    size = 120
+    img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    cx, cy = size // 2, size // 2
+    r = size // 2 - 2
+    draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(30, 30, 30, 80), outline=(120, 200, 80, 160))
+    # Inner ring
+    ri = r * 2 // 3
+    draw.ellipse([cx - ri, cy - ri, cx + ri, cy + ri], outline=(80, 160, 60, 100))
+    # Cross guides
+    draw.line([cx, cy - r + 8, cx, cy + r - 8], fill=(80, 160, 60, 60), width=1)
+    draw.line([cx - r + 8, cy, cx + r - 8, cy], fill=(80, 160, 60, 60), width=1)
+    save(img, "touchpad_bg.png")
+
+    # Touchpad knob (40x40) — smaller filled circle
+    ks = 40
+    img = Image.new('RGBA', (ks, ks), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    kr = ks // 2 - 2
+    kcx, kcy = ks // 2, ks // 2
+    draw.ellipse([kcx - kr, kcy - kr, kcx + kr, kcy + kr], fill=(80, 180, 60, 180), outline=(120, 220, 80, 220))
+    # Highlight
+    hr = kr // 2
+    draw.ellipse([kcx - hr, kcy - hr - 2, kcx + hr, kcy - 2], fill=(120, 220, 100, 100))
+    save(img, "touchpad_knob.png")
+
+    # Weapon switch button (48x48) — rounded square with cycle arrows
+    bs = 48
+    img = Image.new('RGBA', (bs, bs), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    draw.rounded_rectangle([2, 2, bs - 3, bs - 3], radius=8, fill=(30, 30, 30, 120), outline=(60, 180, 255, 180))
+    # "W" letter for weapon
+    draw.text((bs // 2 - 4, bs // 2 - 6), "W", fill=(60, 180, 255, 220))
+    # Small cycle arrow hint (triangle)
+    draw.polygon([(bs - 14, 8), (bs - 8, 12), (bs - 14, 16)], fill=(60, 180, 255, 160))
+    save(img, "btn_weapon.png")
+
 # === SPLASH / BG / LOGO — inspired by idea.jpg (T-Rex on military tank, palms, mountains) ===
 
 def _draw_mountains(draw, w, y_base, peaks, color_dark, color_light):
@@ -642,5 +683,6 @@ if __name__ == "__main__":
     gen_pickups()
     gen_explosions()
     gen_ui()
+    gen_touch_controls()
     gen_bg()
     print("\nDone!")

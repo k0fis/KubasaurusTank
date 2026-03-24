@@ -33,12 +33,9 @@ public class FuelSys implements KfsSystem {
         float drain = moving ? pc.fuelDrainMove : pc.fuelDrainIdle;
         pc.fuel = Math.max(0, pc.fuel - drain * delta);
 
-        // Game over when fuel empty for too long
+        // Game over immediately when fuel empty
         if (pc.fuel <= 0) {
-            pc.fuelEmptyTimer += delta;
-            if (pc.fuelEmptyTimer >= KfsConst.FUEL_GAMEOVER_DELAY) {
-                world.gameOver(false);
-            }
+            world.gameOver(false);
         }
     }
 }

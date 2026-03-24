@@ -3,6 +3,7 @@ package kfs.tank.sys;
 import kfs.tank.KfsConst;
 import kfs.tank.Tile;
 import kfs.tank.World;
+import kfs.tank.comp.ColliderComp;
 import kfs.tank.comp.PositionComp;
 import kfs.tank.comp.VelocityComp;
 import kfs.tank.ecs.Entity;
@@ -50,14 +51,17 @@ public class PhysicsSys implements KfsSystem {
             float newX = pos.x + vel.vx * delta;
             float newY = pos.y + vel.vy * delta;
 
-            // Tile collision - try X then Y separately
-            if (world.canPass(newX, pos.y)) {
+            // Tile collision - check with entity radius for proper edge stopping
+            ColliderComp col = world.getComponent(e, ColliderComp.class);
+            float r = col != null ? col.radius : 0f;
+
+            if (world.canPassRadius(newX, pos.y, r)) {
                 pos.x = newX;
             } else {
                 vel.vx = 0;
             }
 
-            if (world.canPass(pos.x, newY)) {
+            if (world.canPassRadius(pos.x, newY, r)) {
                 pos.y = newY;
             } else {
                 vel.vy = 0;
