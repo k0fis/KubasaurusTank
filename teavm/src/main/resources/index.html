@@ -44,22 +44,38 @@
             opacity: 0;
             pointer-events: none;
         }
+        #splash .bg-img {
+            position: absolute;
+            max-width: 80%;
+            max-height: 60%;
+            border-radius: 12px;
+            opacity: 0.7;
+            filter: brightness(0.8);
+        }
+        #splash .overlay {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
         #splash .title {
             font-family: 'Press Start 2P', monospace;
             color: #66ff66;
             font-size: 28px;
-            margin-top: 20px;
+            text-shadow: 2px 2px 8px #000, 0 0 20px #006600;
         }
         #splash .subtitle {
             font-family: 'Press Start 2P', monospace;
             color: #ffcc00;
             font-size: 18px;
             margin-top: 10px;
+            text-shadow: 2px 2px 6px #000;
         }
         #progress-bar {
             width: 200px;
             height: 6px;
-            background: #1a2a1a;
+            background: rgba(26, 42, 26, 0.8);
             border-radius: 3px;
             margin-top: 30px;
             overflow: hidden;
@@ -73,39 +89,66 @@
         }
         #splash .hint {
             font-family: 'Press Start 2P', monospace;
-            color: #334433;
+            color: #557755;
             font-size: 8px;
             margin-top: 15px;
+            text-shadow: 1px 1px 4px #000;
         }
     </style>
 </head>
 <body>
 <div id="splash">
-    <div class="title">KUBASAURUS</div>
-    <div class="subtitle">T A N K</div>
-    <div id="progress-bar"><div id="progress-fill"></div></div>
-    <div class="hint">loading...</div>
+    <img class="bg-img" src="splash_bg.jpg" alt="">
+    <div class="overlay">
+        <div class="title">KUBASAURUS</div>
+        <div class="subtitle">T A N K</div>
+        <div id="progress-bar"><div id="progress-fill"></div></div>
+        <div class="hint">loading...</div>
+    </div>
 </div>
 <canvas id="canvas"></canvas>
 <script>
     let progress = 0;
     const progressFill = document.getElementById('progress-fill');
     const progressInterval = setInterval(() => {
-        progress = Math.min(progress + Math.random() * 15, 90);
+        progress = Math.min(progress + Math.random() * 8, 90);
         progressFill.style.width = progress + '%';
     }, 200);
 
+    let gameReady = false;
     async function start() {
         main();
-        clearInterval(progressInterval);
-        progressFill.style.width = '100%';
-        setTimeout(() => {
-            document.getElementById('splash').classList.add('hidden');
-            setTimeout(() => {
-                document.getElementById('splash').remove();
-            }, 700);
-        }, 300);
+        gameReady = true;
     }
+
+    // Poll canvas for actual rendered content before hiding splash
+    function checkGameRendered() {
+        if (!gameReady) {
+            requestAnimationFrame(checkGameRendered);
+            return;
+        }
+        // Give the game 2 frames to render
+        let frames = 0;
+        function waitFrames() {
+            frames++;
+            if (frames < 10) {
+                requestAnimationFrame(waitFrames);
+                return;
+            }
+            clearInterval(progressInterval);
+            progressFill.style.width = '100%';
+            setTimeout(() => {
+                document.getElementById('splash').classList.add('hidden');
+                setTimeout(() => {
+                    const s = document.getElementById('splash');
+                    if (s) s.remove();
+                }, 700);
+            }, 300);
+        }
+        requestAnimationFrame(waitFrames);
+    }
+    requestAnimationFrame(checkGameRendered);
+
     window.addEventListener("load", start);
     document.addEventListener("gesturestart", e => e.preventDefault());
     document.addEventListener("gesturechange", e => e.preventDefault());
