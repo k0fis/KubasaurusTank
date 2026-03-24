@@ -115,40 +115,52 @@
         progressFill.style.width = progress + '%';
     }, 200);
 
-    let gameReady = false;
+    function hideSplash() {
+        clearInterval(progressInterval);
+        progressFill.style.width = '100%';
+        setTimeout(() => {
+            const s = document.getElementById('splash');
+            if (s) {
+                s.classList.add('hidden');
+                setTimeout(() => s.remove(), 700);
+            }
+        }, 400);
+    }
+
+    let mainStarted = false;
     async function start() {
         main();
-        gameReady = true;
+        mainStarted = true;
+        // Keep splash visible at least 3s after main() to cover libGDX asset loading
+        // Then poll canvas pixels to detect when the game has actually rendered
+        setTimeout(pollForGame, 3000);
     }
 
-    // Poll canvas for actual rendered content before hiding splash
-    function checkGameRendered() {
-        if (!gameReady) {
-            requestAnimationFrame(checkGameRendered);
+    function pollForGame() {
+        const canvas = document.getElementById('canvas');
+        try {
+            const ctx = canvas.getContext('webgl2') || canvas.getContext('webgl');
+            if (ctx) {
+                const px = new Uint8Array(4);
+                // Sample center pixel
+                ctx.readPixels(canvas.width/2, canvas.height/2, 1, 1, ctx.RGBA, ctx.UNSIGNED_BYTE, px);
+                // libGDX loader renders on black bg; game has colored content
+                // If pixel is not pure black, game is rendering
+                if (px[0] > 5 || px[1] > 5 || px[2] > 5) {
+                    hideSplash();
+                    return;
+                }
+            }
+        } catch(e) {}
+        // Fallback: max wait 8s total, then hide anyway
+        if (Date.now() - loadStart > 8000) {
+            hideSplash();
             return;
         }
-        // Give the game 2 frames to render
-        let frames = 0;
-        function waitFrames() {
-            frames++;
-            if (frames < 10) {
-                requestAnimationFrame(waitFrames);
-                return;
-            }
-            clearInterval(progressInterval);
-            progressFill.style.width = '100%';
-            setTimeout(() => {
-                document.getElementById('splash').classList.add('hidden');
-                setTimeout(() => {
-                    const s = document.getElementById('splash');
-                    if (s) s.remove();
-                }, 700);
-            }, 300);
-        }
-        requestAnimationFrame(waitFrames);
+        setTimeout(pollForGame, 300);
     }
-    requestAnimationFrame(checkGameRendered);
 
+    const loadStart = Date.now();
     window.addEventListener("load", start);
     document.addEventListener("gesturestart", e => e.preventDefault());
     document.addEventListener("gesturechange", e => e.preventDefault());
