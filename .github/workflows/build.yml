@@ -43,14 +43,16 @@ jobs:
           make_latest: true
 
       - name: Deploy to server
-        if: ${{ secrets.DEPLOY_HOST != '' }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.DEPLOY_PORT }} ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
-          scp -i ~/.ssh/deploy_key -P ${{ secrets.DEPLOY_PORT }} kfstank-web.tar.gz ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/tmp/
-          ssh -i ~/.ssh/deploy_key -p ${{ secrets.DEPLOY_PORT }} ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} '
+          SCP="scp -i ~/.ssh/deploy_key -P ${{ secrets.DEPLOY_PORT }}"
+          SSH="ssh -i ~/.ssh/deploy_key -p ${{ secrets.DEPLOY_PORT }}"
+          DEST="${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}"
+          $SCP kfstank-web.tar.gz $DEST:/tmp/
+          $SSH $DEST '
             mkdir -p ~/www/kuba/gm009 &&
             rm -rf ~/www/kuba/gm009/* &&
             tar -xzf /tmp/kfstank-web.tar.gz -C ~/www/kuba/gm009 &&
